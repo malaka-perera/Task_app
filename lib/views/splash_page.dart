@@ -68,8 +68,8 @@ class _SplashPageState extends State<SplashPage>
             context,
             PageRouteBuilder(
               transitionDuration: const Duration(milliseconds: 600),
-              pageBuilder: (_, __, ___) => HomePage(controller: widget.controller),
-              transitionsBuilder: (_, animation, __, child) {
+              pageBuilder: (_, _, _) => HomePage(controller: widget.controller),
+              transitionsBuilder: (_, animation, _, child) {
                 return FadeTransition(opacity: animation, child: child);
               },
             ),

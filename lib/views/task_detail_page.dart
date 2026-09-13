@@ -76,18 +76,102 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
     );
   }
 
+  void _showAttachmentPreview(
+      String filename, String details, IconData icon, Color color) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(icon, color: color, size: 22),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                filename,
+                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              details,
+              style: TextStyle(fontSize: 13, color: Colors.grey.shade700, height: 1.4),
+            ),
+            const SizedBox(height: 16),
+            Container(
+              width: double.infinity,
+              height: 120,
+              decoration: BoxDecoration(
+                color: Colors.grey.shade100,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.grey.shade300),
+              ),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(icon, size: 36, color: color),
+                  const SizedBox(height: 6),
+                  const Text(
+                    'Preview Rendered Locally',
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Close'),
+          ),
+          FilledButton.icon(
+            style: FilledButton.styleFrom(
+              backgroundColor: color,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+            onPressed: () {
+              Navigator.pop(ctx);
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Downloading $filename...'),
+                  behavior: SnackBarBehavior.floating,
+                ),
+              );
+            },
+            icon: const Icon(Icons.download_rounded, size: 16),
+            label: const Text('Download'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final task = widget.task;
+    final isDone = task.completed == true;
     final priorityColor = _getPriorityColor(task.priority);
     final priorityBg = _getPriorityBgColor(task.priority);
 
     final completedMilestones =
-        task.milestones.where((m) => m.completed).length;
+        task.milestones.where((m) => m.completed == true).length;
     final totalMilestones = task.milestones.length;
     final progress = totalMilestones > 0
         ? completedMilestones / totalMilestones
-        : (task.completed ? 1.0 : 0.0);
+        : (isDone ? 1.0 : 0.0);
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8F9FE),
@@ -235,14 +319,14 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
                         color: priorityColor,
                       ),
                       _buildPill(
-                        icon: task.completed
+                        icon: isDone
                             ? Icons.check_circle_rounded
                             : Icons.fiber_manual_record,
-                        label: task.completed ? 'Completed' : 'Pending',
-                        bg: task.completed
+                        label: isDone ? 'Completed' : 'Pending',
+                        bg: isDone
                             ? const Color(0xFFE0F2F1)
                             : const Color(0xFFFFEBEE),
-                        color: task.completed
+                        color: isDone
                             ? const Color(0xFF00796B)
                             : const Color(0xFFD32F2F),
                       ),
@@ -271,8 +355,8 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
                       fontSize: 26,
                       fontWeight: FontWeight.bold,
                       decoration:
-                          task.completed ? TextDecoration.lineThrough : null,
-                      color: task.completed ? Colors.grey : const Color(0xFF1E293B),
+                          isDone ? TextDecoration.lineThrough : null,
+                      color: isDone ? Colors.grey : const Color(0xFF1E293B),
                     ),
                   ),
 
@@ -367,131 +451,139 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    task.description ??
-                        'Literature review on distributed consensus algorithms (Raft vs PBFT) with at least 8 peer-reviewed IEEE citations.',
-                    style: const TextStyle(
+                    (task.description != null &&
+                            task.description!.trim().isNotEmpty)
+                        ? task.description!
+                        : 'No additional notes provided for this task.',
+                    style: TextStyle(
                       fontSize: 14,
                       height: 1.5,
-                      color: Color(0xFF334155),
+                      color: (task.description != null &&
+                              task.description!.trim().isNotEmpty)
+                          ? const Color(0xFF334155)
+                          : const Color(0xFF94A3B8),
                     ),
                   ),
 
                   const SizedBox(height: 18),
 
-                  // Attachment preview cards
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Container(
-                          height: 110,
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(12),
-                            gradient: const LinearGradient(
-                              colors: [Color(0xFF1E293B), Color(0xFF334155)],
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                            ),
-                          ),
-                          child: Stack(
-                            children: [
-                              Center(
-                                child: Icon(Icons.laptop_chromebook,
-                                    size: 40,
-                                    color: Colors.white.withValues(alpha: 0.3)),
+                  // Attachment cards (Dynamic)
+                  if (task.attachments.isNotEmpty)
+                    Row(
+                      children: task.attachments.map((att) {
+                        final isPdf = att.toLowerCase().endsWith('.pdf');
+                        return Expanded(
+                          child: Container(
+                            margin: const EdgeInsets.only(right: 8),
+                            child: InkWell(
+                              borderRadius: BorderRadius.circular(12),
+                              onTap: () => _showAttachmentPreview(
+                                att,
+                                isPdf
+                                    ? 'Document • Reference Material'
+                                    : 'Image • Attached Note',
+                                isPdf
+                                    ? Icons.picture_as_pdf_rounded
+                                    : Icons.image_rounded,
+                                isPdf
+                                    ? const Color(0xFF4F46E5)
+                                    : const Color(0xFFD97706),
                               ),
-                              Positioned(
-                                bottom: 8,
-                                left: 8,
-                                right: 8,
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 8, vertical: 4),
-                                  decoration: BoxDecoration(
-                                    color: Colors.black.withValues(alpha: 0.6),
-                                    borderRadius: BorderRadius.circular(6),
-                                  ),
-                                  child: const Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Icon(Icons.attachment,
-                                          size: 12, color: Colors.white),
-                                      SizedBox(width: 4),
-                                      Expanded(
-                                        child: Text(
-                                          'Raft-Spec.pdf',
-                                          overflow: TextOverflow.ellipsis,
-                                          style: TextStyle(
-                                            color: Colors.white,
-                                            fontSize: 11,
-                                            fontWeight: FontWeight.w500,
-                                          ),
-                                        ),
-                                      ),
-                                    ],
+                              child: Container(
+                                height: 90,
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(12),
+                                  gradient: LinearGradient(
+                                    colors: isPdf
+                                        ? [
+                                            const Color(0xFF1E293B),
+                                            const Color(0xFF334155)
+                                          ]
+                                        : [
+                                            const Color(0xFFB45309),
+                                            const Color(0xFFD97706)
+                                          ],
+                                    begin: Alignment.topLeft,
+                                    end: Alignment.bottomRight,
                                   ),
                                 ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Container(
-                          height: 110,
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(12),
-                            gradient: const LinearGradient(
-                              colors: [Color(0xFFB45309), Color(0xFFD97706)],
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                            ),
-                          ),
-                          child: Stack(
-                            children: [
-                              Center(
-                                child: Icon(Icons.draw_outlined,
-                                    size: 40,
-                                    color: Colors.white.withValues(alpha: 0.3)),
-                              ),
-                              Positioned(
-                                bottom: 8,
-                                left: 8,
-                                right: 8,
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 8, vertical: 4),
-                                  decoration: BoxDecoration(
-                                    color: Colors.black.withValues(alpha: 0.6),
-                                    borderRadius: BorderRadius.circular(6),
-                                  ),
-                                  child: const Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Icon(Icons.image_outlined,
-                                          size: 12, color: Colors.white),
-                                      SizedBox(width: 4),
-                                      Expanded(
-                                        child: Text(
-                                          'Lab-Notes.png',
-                                          overflow: TextOverflow.ellipsis,
-                                          style: TextStyle(
-                                            color: Colors.white,
-                                            fontSize: 11,
-                                            fontWeight: FontWeight.w500,
-                                          ),
+                                child: Stack(
+                                  children: [
+                                    Center(
+                                      child: Icon(
+                                        isPdf
+                                            ? Icons.description_outlined
+                                            : Icons.image_outlined,
+                                        size: 32,
+                                        color: Colors.white
+                                            .withValues(alpha: 0.3),
+                                      ),
+                                    ),
+                                    Positioned(
+                                      bottom: 6,
+                                      left: 6,
+                                      right: 6,
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: 6, vertical: 3),
+                                        decoration: BoxDecoration(
+                                          color: Colors.black
+                                              .withValues(alpha: 0.6),
+                                          borderRadius:
+                                              BorderRadius.circular(6),
+                                        ),
+                                        child: Row(
+                                          children: [
+                                            const Icon(Icons.attachment,
+                                                size: 11, color: Colors.white),
+                                            const SizedBox(width: 4),
+                                            Expanded(
+                                              child: Text(
+                                                att,
+                                                overflow: TextOverflow.ellipsis,
+                                                style: const TextStyle(
+                                                  color: Colors.white,
+                                                  fontSize: 10,
+                                                  fontWeight: FontWeight.w500,
+                                                ),
+                                              ),
+                                            ),
+                                          ],
                                         ),
                                       ),
-                                    ],
-                                  ),
+                                    ),
+                                  ],
                                 ),
                               ),
-                            ],
+                            ),
                           ),
-                        ),
+                        );
+                      }).toList(),
+                    )
+                  else
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF8FAFC),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: const Color(0xFFE2E8F0)),
                       ),
-                    ],
-                  ),
+                      child: const Row(
+                        children: [
+                          Icon(Icons.attach_file_rounded,
+                              size: 16, color: Color(0xFF94A3B8)),
+                          SizedBox(width: 8),
+                          Text(
+                            'No file attachments for this task',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Color(0xFF94A3B8),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
 
                   const SizedBox(height: 24),
 
@@ -545,12 +637,13 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
                   // Milestones checklist
                   ...List.generate(task.milestones.length, (idx) {
                     final m = task.milestones[idx];
+                    final mDone = m.completed == true;
                     return Container(
                       margin: const EdgeInsets.only(bottom: 8),
                       padding: const EdgeInsets.symmetric(
                           horizontal: 8, vertical: 6),
                       decoration: BoxDecoration(
-                        color: m.completed
+                        color: mDone
                             ? const Color(0xFFF1F5F9)
                             : const Color(0xFFEEF2FF),
                         borderRadius: BorderRadius.circular(10),
@@ -558,7 +651,7 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
                       child: Row(
                         children: [
                           Checkbox(
-                            value: m.completed,
+                            value: mDone,
                             activeColor: const Color(0xFF0D9488),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(4),
@@ -574,13 +667,13 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
                               m.title,
                               style: TextStyle(
                                 fontSize: 13,
-                                decoration: m.completed
+                                decoration: mDone
                                     ? TextDecoration.lineThrough
                                     : null,
-                                color: m.completed
+                                color: mDone
                                     ? Colors.grey.shade500
                                     : const Color(0xFF1E293B),
-                                fontWeight: m.completed
+                                fontWeight: mDone
                                     ? FontWeight.normal
                                     : FontWeight.w500,
                               ),
@@ -593,6 +686,33 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
                       ),
                     );
                   }),
+
+                  if (totalMilestones > 0 && completedMilestones == totalMilestones) ...[
+                    const SizedBox(height: 10),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFCCFBF1),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Row(
+                        children: [
+                          Icon(Icons.celebration_rounded,
+                              size: 18, color: Color(0xFF0F766E)),
+                          SizedBox(width: 8),
+                          Text(
+                            'All academic milestones completed! 🎉',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF0F766E),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
 
                   const SizedBox(height: 24),
 
@@ -607,7 +727,7 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
                         });
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
-                            content: Text(task.completed
+                            content: Text(task.completed == true
                                 ? 'Task marked as completed'
                                 : 'Task marked as pending'),
                             behavior: SnackBarBehavior.floating,
@@ -616,18 +736,18 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
                         );
                       },
                       style: FilledButton.styleFrom(
-                        backgroundColor: task.completed
+                        backgroundColor: isDone
                             ? const Color(0xFF475569)
                             : const Color(0xFF0F766E),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),
                       ),
-                      icon: Icon(task.completed
+                      icon: Icon(isDone
                           ? Icons.replay_rounded
                           : Icons.check_circle_outline_rounded),
                       label: Text(
-                        task.completed
+                        isDone
                             ? 'Mark as Pending'
                             : 'Mark as Complete',
                         style: const TextStyle(

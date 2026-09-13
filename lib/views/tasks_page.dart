@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import '../controllers/task_controller.dart';
 import '../models/task.dart';
 import '../widgets/app_logo.dart';
+import '../widgets/modern_nav_bar.dart';
+import '../widgets/task_card.dart';
 import 'add_task_page.dart';
 import 'task_detail_page.dart';
 
@@ -46,74 +48,14 @@ class _TasksPageState extends State<TasksPage> {
     super.dispose();
   }
 
-  Color _getPriorityColor(String priority) {
-    switch (priority) {
-      case 'High':
-        return const Color(0xFFE53935);
-      case 'Medium':
-        return const Color(0xFFF59E0B);
-      case 'Low':
-        return const Color(0xFF10B981);
-      default:
-        return Colors.grey;
-    }
-  }
-
-  Color _getPriorityBg(String priority) {
-    switch (priority) {
-      case 'High':
-        return const Color(0xFFFFEBEE);
-      case 'Medium':
-        return const Color(0xFFFEF3C7);
-      case 'Low':
-        return const Color(0xFFE0F2F1);
-      default:
-        return Colors.grey.shade100;
-    }
-  }
-
-  Color _getCategoryColor(String category) {
-    switch (category) {
-      case 'Research':
-        return const Color(0xFF6366F1);
-      case 'Lecture':
-        return const Color(0xFF3B82F6);
-      case 'Exam':
-        return const Color(0xFFEF4444);
-      case 'Assignment':
-        return const Color(0xFF0D9488);
-      case 'Personal':
-        return const Color(0xFF8B5CF6);
-      default:
-        return const Color(0xFF64748B);
-    }
-  }
-
-  IconData _getCategoryIcon(String category) {
-    switch (category) {
-      case 'Research':
-        return Icons.biotech_outlined;
-      case 'Lecture':
-        return Icons.laptop_chromebook;
-      case 'Exam':
-        return Icons.edit_note_rounded;
-      case 'Assignment':
-        return Icons.description_outlined;
-      case 'Personal':
-        return Icons.person_outline_rounded;
-      default:
-        return Icons.bookmark_border_rounded;
-    }
-  }
-
   List<Task> _getProcessedTasks() {
     var list = List<Task>.from(widget.controller.tasks);
 
     // Status filter
     if (_statusFilter == 'Pending') {
-      list = list.where((t) => !t.completed).toList();
+      list = list.where((t) => t.completed != true).toList();
     } else if (_statusFilter == 'Completed') {
-      list = list.where((t) => t.completed).toList();
+      list = list.where((t) => t.completed == true).toList();
     }
 
     // Category filter
@@ -139,8 +81,10 @@ class _TasksPageState extends State<TasksPage> {
     if (_sortBy == 'Urgency') {
       final order = {'High': 0, 'Medium': 1, 'Low': 2};
       list.sort((a, b) {
-        if (a.completed != b.completed) {
-          return a.completed ? 1 : -1;
+        final aDone = a.completed == true;
+        final bDone = b.completed == true;
+        if (aDone != bDone) {
+          return aDone ? 1 : -1;
         }
         final pa = order[a.priority] ?? 3;
         final pb = order[b.priority] ?? 3;
@@ -154,39 +98,6 @@ class _TasksPageState extends State<TasksPage> {
     }
 
     return list;
-  }
-
-  void _confirmDelete(Task task) {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Delete Task'),
-        content: Text('Are you sure you want to delete "${task.title}"?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            style: FilledButton.styleFrom(
-              backgroundColor: const Color(0xFFE53935),
-            ),
-            onPressed: () {
-              widget.controller.removeTask(task);
-              Navigator.pop(ctx);
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('Task "${task.title}" deleted'),
-                  behavior: SnackBarBehavior.floating,
-                  duration: const Duration(seconds: 2),
-                ),
-              );
-            },
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
-    );
   }
 
   @override
@@ -448,7 +359,7 @@ class _TasksPageState extends State<TasksPage> {
 
               const Divider(height: 1, color: Color(0xFFECEFF1)),
 
-              // Tasks List
+              // Tasks List with Swipe to dismiss / complete
               Expanded(
                 child: processedTasks.isEmpty
                     ? Center(
@@ -503,39 +414,97 @@ class _TasksPageState extends State<TasksPage> {
                         ),
                       )
                     : ListView.builder(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 16, vertical: 12),
+                        padding: const EdgeInsets.fromLTRB(16, 12, 16, 80),
                         itemCount: processedTasks.length,
                         itemBuilder: (context, index) {
                           final task = processedTasks[index];
-                          final isDone = task.completed;
-                          final priorityColor = _getPriorityColor(task.priority);
-                          final priorityBg = _getPriorityBg(task.priority);
-                          final categoryColor =
-                              _getCategoryColor(task.category);
+                          final isDone = task.completed == true;
 
-                          return Container(
-                            margin: const EdgeInsets.only(bottom: 10),
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(14),
-                              border: Border.all(
-                                color: isDone
-                                    ? Colors.grey.shade200
-                                    : const Color(0xFFE2E8F0),
+                          return Dismissible(
+                            key: ValueKey('task_page_${task.title}_${task.deadline}_$index'),
+                            direction: DismissDirection.horizontal,
+                            background: Container(
+                              margin: const EdgeInsets.only(bottom: 10),
+                              padding: const EdgeInsets.symmetric(horizontal: 20),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF0D9488),
+                                borderRadius: BorderRadius.circular(14),
                               ),
-                              boxShadow: isDone
-                                  ? null
-                                  : [
-                                      BoxShadow(
-                                        color: Colors.black.withValues(alpha: 0.02),
-                                        blurRadius: 6,
-                                        offset: const Offset(0, 2),
-                                      ),
-                                    ],
+                              alignment: Alignment.centerLeft,
+                              child: Row(
+                                children: [
+                                  Icon(
+                                    isDone
+                                        ? Icons.replay_rounded
+                                        : Icons.check_circle_rounded,
+                                    color: Colors.white,
+                                    size: 24,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    isDone ? 'Mark Pending' : 'Complete',
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
-                            child: InkWell(
-                              borderRadius: BorderRadius.circular(14),
+                            secondaryBackground: Container(
+                              margin: const EdgeInsets.only(bottom: 10),
+                              padding: const EdgeInsets.symmetric(horizontal: 20),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFE53935),
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                              alignment: Alignment.centerRight,
+                              child: const Row(
+                                mainAxisAlignment: MainAxisAlignment.end,
+                                children: [
+                                  Text(
+                                    'Delete',
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                  SizedBox(width: 8),
+                                  Icon(
+                                    Icons.delete_outline_rounded,
+                                    color: Colors.white,
+                                    size: 24,
+                                  ),
+                                ],
+                              ),
+                            ),
+                            confirmDismiss: (direction) async {
+                              if (direction == DismissDirection.startToEnd) {
+                                widget.controller.toggleTaskObjectCompletion(task);
+                                return false;
+                              } else {
+                                final taskIndex =
+                                    widget.controller.tasks.indexOf(task);
+                                widget.controller.removeTask(task);
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text('Task "${task.title}" deleted'),
+                                    behavior: SnackBarBehavior.floating,
+                                    action: SnackBarAction(
+                                      label: 'UNDO',
+                                      textColor: const Color(0xFFA5B4FC),
+                                      onPressed: () {
+                                        widget.controller
+                                            .insertTaskAt(taskIndex, task);
+                                      },
+                                    ),
+                                  ),
+                                );
+                                return true;
+                              }
+                            },
+                            child: TaskCard(
+                              task: task,
                               onTap: () {
                                 Navigator.push(
                                   context,
@@ -547,261 +516,10 @@ class _TasksPageState extends State<TasksPage> {
                                   ),
                                 );
                               },
-                              child: Padding(
-                                padding: const EdgeInsets.all(12),
-                                child: Row(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    // Complete checkbox
-                                    InkWell(
-                                      onTap: () {
-                                        widget.controller
-                                            .toggleTaskObjectCompletion(task);
-                                      },
-                                      child: Container(
-                                        width: 22,
-                                        height: 22,
-                                        margin: const EdgeInsets.only(top: 2),
-                                        decoration: BoxDecoration(
-                                          color: isDone
-                                              ? const Color(0xFF0D9488)
-                                              : Colors.white,
-                                          borderRadius:
-                                              BorderRadius.circular(6),
-                                          border: Border.all(
-                                            color: isDone
-                                                ? const Color(0xFF0D9488)
-                                                : Colors.grey.shade400,
-                                            width: 1.5,
-                                          ),
-                                        ),
-                                        child: isDone
-                                            ? const Icon(Icons.check_rounded,
-                                                size: 15, color: Colors.white)
-                                            : null,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 12),
-
-                                    // Content
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          // Badges row
-                                          Wrap(
-                                            spacing: 6,
-                                            runSpacing: 4,
-                                            children: [
-                                              // Category
-                                              Container(
-                                                padding:
-                                                    const EdgeInsets.symmetric(
-                                                        horizontal: 7,
-                                                        vertical: 2),
-                                                decoration: BoxDecoration(
-                                                  color: categoryColor
-                                                      .withValues(alpha: 0.1),
-                                                  borderRadius:
-                                                      BorderRadius.circular(6),
-                                                ),
-                                                child: Row(
-                                                  mainAxisSize:
-                                                      MainAxisSize.min,
-                                                  children: [
-                                                    Icon(
-                                                        _getCategoryIcon(
-                                                            task.category),
-                                                        size: 11,
-                                                        color: categoryColor),
-                                                    const SizedBox(width: 4),
-                                                    Text(
-                                                      task.category,
-                                                      style: TextStyle(
-                                                        fontSize: 10,
-                                                        fontWeight:
-                                                            FontWeight.bold,
-                                                        color: categoryColor,
-                                                      ),
-                                                    ),
-                                                  ],
-                                                ),
-                                              ),
-                                              // Priority
-                                              Container(
-                                                padding:
-                                                    const EdgeInsets.symmetric(
-                                                        horizontal: 7,
-                                                        vertical: 2),
-                                                decoration: BoxDecoration(
-                                                  color: priorityBg,
-                                                  borderRadius:
-                                                      BorderRadius.circular(6),
-                                                ),
-                                                child: Row(
-                                                  mainAxisSize:
-                                                      MainAxisSize.min,
-                                                  children: [
-                                                    Icon(Icons.flag_rounded,
-                                                        size: 11,
-                                                        color: priorityColor),
-                                                    const SizedBox(width: 4),
-                                                    Text(
-                                                      task.priority,
-                                                      style: TextStyle(
-                                                        fontSize: 10,
-                                                        fontWeight:
-                                                            FontWeight.bold,
-                                                        color: priorityColor,
-                                                      ),
-                                                    ),
-                                                  ],
-                                                ),
-                                              ),
-                                              // Course badge
-                                              if (task.course != null)
-                                                Container(
-                                                  padding: const EdgeInsets
-                                                      .symmetric(
-                                                      horizontal: 7,
-                                                      vertical: 2),
-                                                  decoration: BoxDecoration(
-                                                    color:
-                                                        const Color(0xFFEEF2FF),
-                                                    borderRadius:
-                                                        BorderRadius.circular(
-                                                            6),
-                                                  ),
-                                                  child: Text(
-                                                    task.course!,
-                                                    style: const TextStyle(
-                                                      fontSize: 10,
-                                                      fontWeight:
-                                                          FontWeight.w700,
-                                                      color: Color(0xFF4338CA),
-                                                    ),
-                                                  ),
-                                                ),
-                                            ],
-                                          ),
-
-                                          const SizedBox(height: 6),
-
-                                          // Title
-                                          Text(
-                                            task.title,
-                                            style: TextStyle(
-                                              fontSize: 14,
-                                              fontWeight: FontWeight.bold,
-                                              decoration: isDone
-                                                  ? TextDecoration.lineThrough
-                                                  : null,
-                                              color: isDone
-                                                  ? Colors.grey.shade500
-                                                  : const Color(0xFF0F172A),
-                                            ),
-                                          ),
-
-                                          if (task.description != null) ...[
-                                            const SizedBox(height: 2),
-                                            Text(
-                                              task.description!,
-                                              maxLines: 1,
-                                              overflow: TextOverflow.ellipsis,
-                                              style: TextStyle(
-                                                fontSize: 11,
-                                                color: isDone
-                                                    ? Colors.grey.shade400
-                                                    : const Color(0xFF64748B),
-                                              ),
-                                            ),
-                                          ],
-
-                                          const SizedBox(height: 8),
-
-                                          // Footer info
-                                          Wrap(
-                                            crossAxisAlignment:
-                                                WrapCrossAlignment.center,
-                                            spacing: 6,
-                                            runSpacing: 2,
-                                            children: [
-                                              Row(
-                                                mainAxisSize: MainAxisSize.min,
-                                                children: [
-                                                  Icon(
-                                                    isDone
-                                                        ? Icons
-                                                            .check_circle_outline
-                                                        : Icons
-                                                            .access_time_rounded,
-                                                    size: 12,
-                                                    color: isDone
-                                                        ? const Color(0xFF0D9488)
-                                                        : Colors.grey.shade600,
-                                                  ),
-                                                  const SizedBox(width: 3),
-                                                  Text(
-                                                    task.deadline ?? 'Upcoming',
-                                                    style: TextStyle(
-                                                      fontSize: 11,
-                                                      fontWeight:
-                                                          FontWeight.w600,
-                                                      color: isDone
-                                                          ? const Color(
-                                                              0xFF0D9488)
-                                                          : Colors.grey.shade600,
-                                                    ),
-                                                  ),
-                                                ],
-                                              ),
-                                              if (task.milestones.isNotEmpty) ...[
-                                                Text('•',
-                                                    style: TextStyle(
-                                                        color: Colors
-                                                            .grey.shade400)),
-                                                Row(
-                                                  mainAxisSize:
-                                                      MainAxisSize.min,
-                                                  children: [
-                                                    const Icon(
-                                                        Icons.alt_route_rounded,
-                                                        size: 11,
-                                                        color:
-                                                            Color(0xFF4338CA)),
-                                                    const SizedBox(width: 3),
-                                                    Text(
-                                                      '${task.milestones.where((m) => m.completed).length}/${task.milestones.length} milestones',
-                                                      style: const TextStyle(
-                                                        fontSize: 10,
-                                                        color:
-                                                            Color(0xFF4338CA),
-                                                        fontWeight:
-                                                            FontWeight.w600,
-                                                      ),
-                                                    ),
-                                                  ],
-                                                ),
-                                              ],
-                                            ],
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-
-                                    // Trailing delete icon
-                                    IconButton(
-                                      icon: const Icon(
-                                          Icons.delete_outline_rounded,
-                                          size: 18,
-                                          color: Color(0xFFE53935)),
-                                      tooltip: 'Delete',
-                                      onPressed: () => _confirmDelete(task),
-                                    ),
-                                  ],
-                                ),
-                              ),
+                              onToggleComplete: () {
+                                widget.controller
+                                    .toggleTaskObjectCompletion(task);
+                              },
                             ),
                           );
                         },
@@ -811,24 +529,8 @@ class _TasksPageState extends State<TasksPage> {
           );
         },
       ),
-      floatingActionButton: FloatingActionButton(
-        backgroundColor: const Color(0xFF3730A3),
-        onPressed: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => AddTaskPage(controller: widget.controller),
-            ),
-          );
-        },
-        child: const Icon(Icons.add, color: Colors.white),
-      ),
-      bottomNavigationBar: BottomNavigationBar(
+      bottomNavigationBar: ModernNavBar(
         currentIndex: 2,
-        selectedItemColor: const Color(0xFF4F46E5),
-        unselectedItemColor: Colors.grey.shade500,
-        backgroundColor: Colors.white,
-        elevation: 8,
         onTap: (index) {
           if (index == 0) {
             Navigator.pop(context);
@@ -841,20 +543,6 @@ class _TasksPageState extends State<TasksPage> {
             );
           }
         },
-        items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.grid_view_rounded),
-            label: 'Dashboard',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.add_circle_rounded),
-            label: 'Add Task',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.check_circle_outline_rounded),
-            label: 'Tasks',
-          ),
-        ],
       ),
     );
   }

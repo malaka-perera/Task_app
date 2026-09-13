@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../controllers/task_controller.dart';
 import '../models/task.dart';
 import '../widgets/app_logo.dart';
+import '../widgets/modern_nav_bar.dart';
 import 'tasks_page.dart';
 
 class AddTaskPage extends StatefulWidget {
@@ -16,6 +17,7 @@ class AddTaskPage extends StatefulWidget {
 class _AddTaskPageState extends State<AddTaskPage> {
   final _formKey = GlobalKey<FormState>();
   final _titleController = TextEditingController();
+  final _notesController = TextEditingController();
 
   final List<Map<String, dynamic>> _categories = [
     {'name': 'Assignment', 'icon': Icons.description_outlined},
@@ -56,12 +58,14 @@ class _AddTaskPageState extends State<AddTaskPage> {
   @override
   void dispose() {
     _titleController.dispose();
+    _notesController.dispose();
     super.dispose();
   }
 
   void _resetForm() {
     setState(() {
       _titleController.clear();
+      _notesController.clear();
       _selectedCategory = _categories.first['name'] as String;
       _selectedCourse = _courses.first;
       _selectedDuration = '2 hrs';
@@ -117,6 +121,7 @@ class _AddTaskPageState extends State<AddTaskPage> {
 
   void _submitForm() {
     if (_formKey.currentState?.validate() ?? false) {
+      final notesText = _notesController.text.trim();
       final task = Task(
         title: _titleController.text.trim(),
         category: _selectedCategory,
@@ -124,10 +129,12 @@ class _AddTaskPageState extends State<AddTaskPage> {
         course: _selectedCourse,
         duration: _selectedDuration,
         deadline: _formatDateTime(),
-        description: 'Coursework task for $_selectedCourse.',
+        description: notesText.isNotEmpty
+            ? notesText
+            : 'Coursework task for $_selectedCourse',
         milestones: [
           TaskMilestone(title: 'Review requirement brief', completed: false),
-          TaskMilestone(title: 'Prepare initial submission draft', completed: false),
+          TaskMilestone(title: 'Complete and submit', completed: false),
         ],
       );
 
@@ -387,6 +394,47 @@ class _AddTaskPageState extends State<AddTaskPage> {
                     ],
                   ),
                 ],
+
+                const SizedBox(height: 18),
+
+                // Task Notes / Description (Optional)
+                const Text(
+                  'Notes & Requirements (Optional)',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF0F172A),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                TextFormField(
+                  controller: _notesController,
+                  maxLines: 2,
+                  decoration: InputDecoration(
+                    hintText: 'Add description, topics covered, or notes...',
+                    prefixIcon: const Padding(
+                      padding: EdgeInsets.only(bottom: 24),
+                      child: Icon(Icons.notes_rounded, color: Color(0xFF475569)),
+                    ),
+                    filled: true,
+                    fillColor: Colors.white,
+                    contentPadding: const EdgeInsets.symmetric(
+                        vertical: 14, horizontal: 16),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: Colors.grey.shade300),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: Colors.grey.shade300),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide:
+                          const BorderSide(color: Color(0xFF4F46E5), width: 1.5),
+                    ),
+                  ),
+                ),
 
                 const SizedBox(height: 20),
 
@@ -674,6 +722,18 @@ class _AddTaskPageState extends State<AddTaskPage> {
                   ),
                 ),
 
+                const SizedBox(height: 8),
+
+                // Quick preset deadline chips
+                Wrap(
+                  spacing: 6,
+                  children: [
+                    _buildPresetChip('Tomorrow', 1),
+                    _buildPresetChip('In 3 Days', 3),
+                    _buildPresetChip('Next Week', 7),
+                  ],
+                ),
+
                 const SizedBox(height: 20),
 
                 // Urgency & Priority Selector
@@ -864,12 +924,8 @@ class _AddTaskPageState extends State<AddTaskPage> {
           ),
         ),
       ),
-      bottomNavigationBar: BottomNavigationBar(
+      bottomNavigationBar: ModernNavBar(
         currentIndex: 1,
-        selectedItemColor: const Color(0xFF4F46E5),
-        unselectedItemColor: Colors.grey.shade500,
-        backgroundColor: Colors.white,
-        elevation: 8,
         onTap: (index) {
           if (index == 0) {
             Navigator.pop(context);
@@ -882,21 +938,29 @@ class _AddTaskPageState extends State<AddTaskPage> {
             );
           }
         },
-        items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.grid_view_rounded),
-            label: 'Dashboard',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.add_circle_rounded),
-            label: 'Add Task',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.check_circle_outline_rounded),
-            label: 'Tasks',
-          ),
-        ],
       ),
+    );
+  }
+
+  Widget _buildPresetChip(String label, int daysFromNow) {
+    return ActionChip(
+      label: Text(label),
+      labelStyle: const TextStyle(
+        fontSize: 11,
+        fontWeight: FontWeight.w600,
+        color: Color(0xFF4338CA),
+      ),
+      backgroundColor: const Color(0xFFEEF2FF),
+      side: const BorderSide(color: Color(0xFFC7D2FE)),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(20),
+      ),
+      onPressed: () {
+        setState(() {
+          _selectedDate = DateTime.now().add(Duration(days: daysFromNow));
+          _selectedTime = const TimeOfDay(hour: 23, minute: 59);
+        });
+      },
     );
   }
 
